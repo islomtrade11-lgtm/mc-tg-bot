@@ -23,7 +23,7 @@ ALLOWED_USERS = {int(x.strip()) for x in OWNER_IDS_RAW.split(",") if x.strip()}
 bot = Bot(BOT_TOKEN)
 dp = Dispatcher()
 
-mc_process: subprocess.Popen | None = None
+mc_process = None
 ai_enabled = False
 
 # ================== UI ==================
@@ -45,9 +45,9 @@ def main_keyboard():
 
 def status_text():
     return (
-        "🤖 *Minecraft Bot Control*\n\n"
-        f"🟢 Status: *{'ONLINE' if mc_process else 'OFFLINE'}*\n"
-        f"🧠 AI: *{'ON' if ai_enabled else 'OFF'}*"
+        "🤖 Minecraft Bot Control\n\n"
+        f"🟢 Status: {'ONLINE' if mc_process else 'OFFLINE'}\n"
+        f"🧠 AI: {'ON' if ai_enabled else 'OFF'}"
     )
 
 # ================== HELPERS ==================
@@ -64,8 +64,7 @@ async def cmd_start(message: types.Message):
 
     await message.answer(
         status_text(),
-        reply_markup=main_keyboard(),
-        parse_mode="Markdown"
+        reply_markup=main_keyboard()
     )
 
 @dp.callback_query()
@@ -105,8 +104,7 @@ async def on_callback(call: types.CallbackQuery):
     elif data == "status":
         await call.message.answer(
             status_text(),
-            reply_markup=main_keyboard(),
-            parse_mode="Markdown"
+            reply_markup=main_keyboard()
         )
 
     await call.answer()
