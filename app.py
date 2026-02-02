@@ -1,11 +1,12 @@
 import asyncio
 import subprocess
 import os
+import time
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import CommandStart
 
-# ================== ENV & SECURITY ==================
+# ================== ENV ==================
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OWNER_IDS_RAW = os.getenv("OWNER_IDS")
@@ -25,10 +26,11 @@ dp = Dispatcher()
 
 mc_process = None
 ai_enabled = False
+last_click = {}
 
 # ================== UI ==================
 
-def main_keyboard():
+def keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="▶️ Start", callback_data="start"),
@@ -50,30 +52,40 @@ def status_text():
         f"🧠 AI: {'ON' if ai_enabled else 'OFF'}"
     )
 
-# ================== HELPERS ==================
-
-def is_allowed(user_id: int) -> bool:
+def allowed(user_id: int) -> bool:
     return user_id in ALLOWED_USERS
 
 # ================== HANDLERS ==================
 
 @dp.message(CommandStart())
-async def cmd_start(message: types.Message):
-    if not is_allowed(message.from_user.id):
+async def start_cmd(message: types.Message):
+    if not allowed(message.from_user.id):
         return
 
     await message.answer(
         status_text(),
-        reply_markup=main_keyboard()
+        reply_markup=keyboard()
     )
 
 @dp.callback_query()
 async def on_callback(call: types.CallbackQuery):
     global mc_process, ai_enabled
 
-    if not is_allowed(call.from_user.id):
-        await call.answer("⛔ Нет доступа", show_alert=True)
+    # ⚡ ОТВЕЧАЕМ СРАЗУ (чтобы не было query is too old)
+    try:
+        await call.answer("⏳")
+    except:
         return
+
+    if not allowed(call.from_user.id):
+        return
+
+    # ⛔ анти-спам по кнопкам
+    uid = call.from_user.id
+    now = time.time()
+    if uid in last_click and now - last_click[uid] < 1.5:
+        return
+    last_click[uid] = now
 
     data = call.data
 
@@ -95,31 +107,31 @@ async def on_callback(call: types.CallbackQuery):
     elif data == "ai":
         ai_enabled = not ai_enabled
         os.environ["AI_ENABLED"] = "1" if ai_enabled else "0"
-        await call.message.answer(f"🧠 AI {'включён' if ai_enabled else 'выключен'}")
+        await call.message.answer(
+            f"🧠 AI {'включён' if ai_enabled else 'выключен'}"
+        )
 
     elif data == "say":
         await call.message.answer("✍️ Напиши сообщение для Minecraft чата")
-        dp.message.register(wait_say_message)
+        dp.message.register(wait_say)
 
     elif data == "status":
         await call.message.answer(
             status_text(),
-            reply_markup=main_keyboard()
+            reply_markup=keyboard()
         )
-
-    await call.answer()
 
 # ================== SAY MODE ==================
 
-async def wait_say_message(message: types.Message):
-    if not is_allowed(message.from_user.id):
+async def wait_say(message: types.Message):
+    if not allowed(message.from_user.id):
         return
 
     with open("say.txt", "w", encoding="utf-8") as f:
         f.write(message.text)
 
     await message.answer("✅ Сообщение отправлено в Minecraft")
-    dp.message.unregister(wait_say_message)
+    dp.message.unregister(wait_say)
 
 # ================== MAIN ==================
 
